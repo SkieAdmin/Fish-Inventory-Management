@@ -1,0 +1,131 @@
+// Fish Inventory Management System - Database Schema
+// Copyright (C) 2024 John Michael S. Abiol
+// All Rights Reserved
+
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  CUSTOMER
+  OWNER
+}
+
+enum ItemCategory {
+  FISH
+  FISH_FOOD
+  FISH_PLANT
+  AQUARIUM
+}
+
+enum OrderStatus {
+  PENDING
+  COMPLETED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  username  String   @unique
+  password  String
+  name      String
+  role      UserRole @default(CUSTOMER)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  shop      Shop?
+  orders    Order[]
+
+  @@map("users")
+}
+
+model Shop {
+  id          String   @id @default(uuid())
+  name        String
+  description String?  @db.Text
+  ownerId     String   @unique
+  owner       User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  items       InventoryItem[]
+
+  @@map("shops")
+}
+
+model InventoryItem {
+  id          String       @id @default(uuid())
+  name        String
+  category    ItemCategory
+  quantity    Int
+  price       Float
+  description String?      @db.Text
+  shopId      String
+  shop        Shop         @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  // Relations
+  orderItems  OrderItem[]
+
+  @@map("inventory_items")
+}
+
+model Order {
+  id            String      @id @default(uuid())
+  customerId    String
+  customer      User        @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  totalAmount   Float
+  status        OrderStatus @default(PENDING)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  // Relations
+  items         OrderItem[]
+  payment       Payment?
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id        String        @id @default(uuid())
+  orderId   String
+  order     Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  itemId    String
+  item      InventoryItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  quantity  Int
+  price     Float
+  createdAt DateTime      @default(now())
+
+  @@map("order_items")
+}
+
+model Payment {
+  id            String        @id @default(uuid())
+  orderId       String        @unique
+  order         Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  amount        Float
+  status        PaymentStatus @default(PENDING)
+  paymentMethod String
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@map("payments")
+}
