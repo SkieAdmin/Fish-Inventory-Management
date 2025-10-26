@@ -4,10 +4,21 @@ export const getAllInventory = async (req, res) => {
   try {
     const { category, search, shopId } = req.query;
 
+    // If user is OWNER, automatically filter by their shop
+    let finalShopId = shopId;
+    if (req.user.role === 'OWNER') {
+      const shop = await prisma.shop.findUnique({
+        where: { ownerId: req.user.id }
+      });
+      if (shop) {
+        finalShopId = shop.id; // Override with owner's shop
+      }
+    }
+
     const inventory = await prisma.inventoryItem.findMany({
       where: {
         ...(category && { category }),
-        ...(shopId && { shopId }),
+        ...(finalShopId && { shopId: finalShopId }),
         ...(search && {
           OR: [
             { name: { contains: search } },

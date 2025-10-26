@@ -134,9 +134,41 @@ export const getMyOrders = async (req, res) => {
       }
     });
 
+    // Format for mobile app transaction history
+    const formattedOrders = orders.map(order => {
+      // Get shop name from first item (orders should be from same shop)
+      const shopName = order.items[0]?.item?.shop?.name || 'Unknown Shop';
+
+      return {
+        id: order.id,
+        orderId: `ORD-${order.createdAt.getFullYear()}-${order.id.substring(0, 6).toUpperCase()}`,
+        shop: shopName,
+        date: order.createdAt.toISOString().split('T')[0],
+        total: order.totalAmount,
+        status: order.status,
+        paymentMethod: order.payment?.paymentMethod || 'Pending',
+        paypalTransactionId: order.payment?.id || null,
+        items: order.items.map(item => ({
+          name: item.item.name,
+          quantity: item.quantity,
+          price: item.price
+        })),
+        createdAt: order.createdAt
+      };
+    });
+
+    // Calculate total spent
+    const totalSpent = orders
+      .filter(order => order.status === 'COMPLETED')
+      .reduce((sum, order) => sum + order.totalAmount, 0);
+
     res.json({
       success: true,
-      orders
+      data: {
+        transactions: formattedOrders,
+        totalSpent: totalSpent,
+        totalTransactions: formattedOrders.length
+      }
     });
   } catch (error) {
     console.error('Get my orders error:', error);
@@ -256,9 +288,62 @@ export const getShopOrders = async (req, res) => {
       }
     });
 
+    // Calculate statistics for sales reports
+    let totalSales = 0;
+    let totalItems = 0;
+    const completedOrders = orders.filter(order => order.status === 'COMPLETED');
+
+    orders.forEach(order => {
+      // Calculate total for items from this shop only
+      const shopItemsTotal = order.items.reduce((sum, orderItem) => {
+        return sum + (orderItem.price * orderItem.quantity);
+      }, 0);
+
+      if (order.status === 'COMPLETED') {
+        totalSales += shopItemsTotal;
+      }
+
+      totalItems += order.items.reduce((sum, item) => sum + item.quantity, 0);
+    });
+
+    // Format orders for mobile app
+    const formattedOrders = orders.map(order => {
+      const shopItemsTotal = order.items.reduce((sum, orderItem) => {
+        return sum + (orderItem.price * orderItem.quantity);
+      }, 0);
+
+      return {
+        id: order.id,
+        customer: order.customer.name,
+        date: order.createdAt.toISOString().split('T')[0],
+        total: shopItemsTotal,
+        status: order.status,
+        items: order.items.length,
+        itemDetails: order.items.map(item => ({
+          name: item.item.name,
+          quantity: item.quantity,
+          price: item.price
+        })),
+        payment: order.payment ? {
+          method: order.payment.paymentMethod,
+          status: order.payment.status
+        } : null,
+        createdAt: order.createdAt
+      };
+    });
+
     res.json({
       success: true,
-      orders
+      data: {
+        orders: formattedOrders,
+        statistics: {
+          totalOrders: orders.length,
+          completedOrders: completedOrders.length,
+          pendingOrders: orders.filter(o => o.status === 'PENDING').length,
+          totalSales: totalSales,
+          totalItems: totalItems
+        }
+      }
     });
   } catch (error) {
     console.error('Get shop orders error:', error);

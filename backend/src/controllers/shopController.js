@@ -29,7 +29,10 @@ export const getAllShops = async (req, res) => {
         items: {
           select: {
             id: true,
-            category: true
+            name: true,
+            category: true,
+            price: true,
+            quantity: true
           }
         }
       },
@@ -38,15 +41,26 @@ export const getAllShops = async (req, res) => {
       }
     });
 
-    // Add item count per shop
+    // Add item count and category counts per shop
     const shopsWithCounts = shops.map(shop => ({
-      ...shop,
-      itemCount: shop.items.length
+      id: shop.id,
+      name: shop.name,
+      description: shop.description,
+      owner: shop.owner,
+      itemCount: shop.items.length,
+      categories: {
+        FISH: shop.items.filter(item => item.category === 'FISH').length,
+        FISH_FOOD: shop.items.filter(item => item.category === 'FISH_FOOD').length,
+        FISH_PLANT: shop.items.filter(item => item.category === 'FISH_PLANT').length,
+        AQUARIUM: shop.items.filter(item => item.category === 'AQUARIUM').length
+      },
+      createdAt: shop.createdAt,
+      updatedAt: shop.updatedAt
     }));
 
     res.json({
       success: true,
-      shops: shopsWithCounts
+      data: shopsWithCounts
     });
   } catch (error) {
     console.error('Get shops error:', error);
@@ -76,7 +90,7 @@ export const getShopById = async (req, res) => {
         },
         items: {
           where: {
-            ...(category && { category }),
+            ...(category && category !== 'ALL' && { category }),
             ...(search && {
               OR: [
                 { name: { contains: search } },
@@ -98,9 +112,21 @@ export const getShopById = async (req, res) => {
       });
     }
 
+    // Format response to match mobile app expectations
+    const response = {
+      id: shop.id,
+      name: shop.name,
+      description: shop.description,
+      owner: shop.owner,
+      items: shop.items,
+      itemCount: shop.items.length,
+      createdAt: shop.createdAt,
+      updatedAt: shop.updatedAt
+    };
+
     res.json({
       success: true,
-      shop
+      data: response
     });
   } catch (error) {
     console.error('Get shop error:', error);
